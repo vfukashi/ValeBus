@@ -1,0 +1,116 @@
+import { StyleSheet } from 'react-native';
+
+export const styles = StyleSheet.create({
+  mainContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  topBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '35%',
+    backgroundColor: '#0C2612', 
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+  },
+  header: {
+    height: '30%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  avatarCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#A1BF34',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+    elevation: 5,
+  },
+  avatarText: {
+    fontSize: 35,
+    color: '#FFF',
+    fontWeight: 'bold',
+  },
+  userName: {
+    color: '#FFF',
+    fontSize: 22,
+    fontWeight: 'bold',
+  },
+  card: {
+    backgroundColor: '#F8F8F8',
+    marginHorizontal: 25,
+    borderRadius: 20,
+    padding: 25,
+    borderLeftWidth: 6,
+    borderLeftColor: '#A1BF34',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    zIndex: 2,
+    marginTop: -30,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 20,
+  },
+  infoRow: {
+    marginBottom: 15,
+  },
+  label: {
+    fontSize: 11,
+    color: '#999',
+    fontWeight: 'bold',
+  },
+  value: {
+    fontSize: 16,
+    color: '#333',
+    marginTop: 2,
+  },
+  noUserContainer: {
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  noUserText: {
+    color: '#666',
+    marginBottom: 15,
+    fontSize: 15,
+  },
+  loginSmallButton: {
+    backgroundColor: '#A1BF34',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  loginSmallText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+  },
+  buttonArea: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    paddingHorizontal: 25,
+    paddingBottom: 40,
+  },
+  logoutButton: {
+    height: 55,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FF4444',
+  },
+  logoutText: {
+    color: '#FF4444',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+});

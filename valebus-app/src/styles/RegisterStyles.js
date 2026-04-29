@@ -1,0 +1,98 @@
+import { StyleSheet } from 'react-native';
+
+export const styles = StyleSheet.create({
+  mainContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  topBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '35%',
+    backgroundColor: '#0C2612', 
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+  },
+  header: {
+    height: '25%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 30,
+    zIndex: 1,
+  },
+  logo: {
+    fontSize: 40,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+  logoBus: {
+    color: '#A1BF34',
+  },
+  card: {
+    backgroundColor: '#F8F8F8',
+    marginHorizontal: 25,
+    borderRadius: 20,
+    padding: 25,
+    borderLeftWidth: 6,
+    borderLeftColor: '#A1BF34',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    marginTop: -20,
+    zIndex: 2,
+  },
+  cardTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  label: {
+    fontSize: 14,
+    color: '#555',
+    marginBottom: 5,
+    fontWeight: '500',
+  },
+  input: {
+    backgroundColor: '#EEEEEE',
+    height: 50,
+    borderRadius: 25,
+    paddingHorizontal: 20,
+    marginBottom: 15,
+    color: '#333',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  buttonArea: {
+    flex: 1,
+    paddingHorizontal: 25,
+    paddingTop: 40,
+  },
+  button: {
+    backgroundColor: '#A1BF34',
+    height: 60,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: 'bold',
+  },
+  backLink: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  backText: {
+    color: '#0C2612',
+    fontWeight: 'bold',
+    textDecorationLine: 'underline',
+  }
+});
