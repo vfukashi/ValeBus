@@ -14,12 +14,12 @@ export const styles = StyleSheet.create({
   },
   searchBar: {
     backgroundColor: COLORS.whitish, // #E5EEE5
-    height: 45,
-    borderRadius: 25,
+    height: 50,
+    borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 15,
-    marginTop: 15,
+    marginTop: 20,
   },
   menuIcons: {
     flexDirection: 'row',
