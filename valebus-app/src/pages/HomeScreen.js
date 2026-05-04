@@ -1,38 +1,332 @@
-import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
-import { FontAwesome5, Ionicons } from '@expo/vector-icons'; 
-import { useRouter } from 'expo-router'; // Importar o roteador
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View, Text, ScrollView, TouchableOpacity,
+  ActivityIndicator, TextInput, FlatList,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { styles } from '../styles/HomeStyles';
 
+const API_URL = 'http://192.168.1.6:3000'; // ⚠️ mesmo IP que você já usa
+const RECENTES_KEY = '@valebus:linhas_recentes';
+const MAX_RECENTES = 5;
+
+// ─── Helpers de horário ────────────────────────────────────────────────────
+
+/**
+ * Retorna o dia_tipo correto baseado no dia da semana atual (horário de Brasília).
+ * Feriados são ignorados por enquanto (tratados como dia de semana normal).
+ */
+function getDiaTipo() {
+  // Força fuso de Brasília (UTC-3)
+  const agora = new Date(
+    new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' })
+  );
+  const diaSemana = agora.getDay(); // 0=Dom, 1=Seg … 6=Sáb
+
+  if (diaSemana === 0) return 'domingo_feriado';
+  if (diaSemana === 6) return 'sabado';
+  // Terça(2), Quarta(4) e Sexta(5) também cobrem ter_qua_sex
+  if ([2, 3, 5].includes(diaSemana)) return ['semana', 'ter_qua_sex'];
+  return 'semana'; // Segunda(1) e Quinta(4)
+}
+
+/** Converte "HH:MM:SS" ou "HH:MM" em minutos desde meia-noite */
+function toMinutos(horarioStr) {
+  const [h, m] = horarioStr.split(':').map(Number);
+  return h * 60 + m;
+}
+
+/** Retorna "HH:MM" do horário atual no fuso de Brasília */
+function getAgora() {
+  const agora = new Date(
+    new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' })
+  );
+  const h = String(agora.getHours()).padStart(2, '0');
+  const m = String(agora.getMinutes()).padStart(2, '0');
+  return `${h}:${m}`;
+}
+
+/**
+ * Dado o array de horários de uma linha (todos os sub_linhas / dia_tipos),
+ * calcula o próximo horário e o último horário do dia atual.
+ *
+ * Consideramos apenas sub_linhas com sentido "Centro / Bairro" (ida),
+ * pois é o que faz mais sentido para o usuário na home.
+ * Você pode ajustar esse filtro conforme precisar.
+ */
+function calcularHorarios(horariosLinha) {
+  const diaTipo = getDiaTipo(); // string ou array
+  const agoraMin = toMinutos(getAgora());
+
+  // Filtra pelos horários relevantes ao dia atual
+  const horariosHoje = horariosLinha.filter(h => {
+    if (Array.isArray(diaTipo)) return diaTipo.includes(h.dia_tipo);
+    return h.dia_tipo === diaTipo;
+  });
+
+  if (horariosHoje.length === 0) return { proximo: null, ultimo: null };
+
+  const minutosHoje = horariosHoje
+    .map(h => toMinutos(h.horario))
+    .sort((a, b) => a - b);
+
+  const proximoMin = minutosHoje.find(m => m > agoraMin) ?? null;
+  const ultimoMin = minutosHoje[minutosHoje.length - 1];
+
+  const fmt = min => {
+    if (min === null) return null;
+    return `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+  };
+
+  return { proximo: fmt(proximoMin), ultimo: fmt(ultimoMin) };
+}
+
+// ─── Componente principal ──────────────────────────────────────────────────
+
 export default function HomeScreen() {
-  const router = useRouter(); // Inicializar o roteador
+  const router = useRouter();
+
+  const [todasLinhas, setTodasLinhas] = useState([]);
+  const [linhasRecentes, setLinhasRecentes] = useState([]);
+  const [horariosCache, setHorariosCache] = useState({}); // { [linhaId]: [...] }
+  const [busca, setBusca] = useState('');
+  const [resultadosBusca, setResultadosBusca] = useState([]);
+  const [buscando, setBuscando] = useState(false);
+  const [loadingHome, setLoadingHome] = useState(true);
+
+  // Carrega todas as linhas e os IDs recentes ao montar
+  useEffect(() => {
+    Promise.all([buscarTodasLinhas(), carregarRecentes()]);
+  }, []);
+
+  // Quando as linhas recentes ou o cache de horários mudam, busca horários faltando
+  useEffect(() => {
+    linhasRecentes.forEach(linha => {
+      if (!horariosCache[linha.id]) {
+        buscarHorarios(linha.id);
+      }
+    });
+  }, [linhasRecentes]);
+
+  // ── Dados ────────────────────────────────────────────────────────────────
+
+  async function buscarTodasLinhas() {
+    try {
+      const res = await fetch(`${API_URL}/linhas`);
+      const data = await res.json();
+      setTodasLinhas(data);
+    } catch (e) {
+      console.error('Erro ao buscar linhas:', e);
+    } finally {
+      setLoadingHome(false);
+    }
+  }
+
+  async function buscarHorarios(linhaId) {
+    try {
+      const res = await fetch(`${API_URL}/linhas/${linhaId}/horarios`);
+      const data = await res.json();
+      setHorariosCache(prev => ({ ...prev, [linhaId]: data }));
+    } catch (e) {
+      console.error(`Erro ao buscar horários da linha ${linhaId}:`, e);
+    }
+  }
+
+  // ── Recentes (AsyncStorage) ───────────────────────────────────────────────
+
+  async function carregarRecentes() {
+    try {
+      const raw = await AsyncStorage.getItem(RECENTES_KEY);
+      const ids = raw ? JSON.parse(raw) : [];
+      // ids é array de objetos { id, codigo, nome }
+      setLinhasRecentes(ids);
+    } catch (e) {
+      console.error('Erro ao carregar recentes:', e);
+    }
+  }
+
+  async function salvarRecente(linha) {
+    try {
+      const raw = await AsyncStorage.getItem(RECENTES_KEY);
+      let recentes = raw ? JSON.parse(raw) : [];
+      // Remove se já existe e coloca no topo
+      recentes = recentes.filter(r => r.id !== linha.id);
+      recentes.unshift({ id: linha.id, codigo: linha.codigo, nome: linha.nome });
+      if (recentes.length > MAX_RECENTES) recentes = recentes.slice(0, MAX_RECENTES);
+      await AsyncStorage.setItem(RECENTES_KEY, JSON.stringify(recentes));
+      setLinhasRecentes(recentes);
+    } catch (e) {
+      console.error('Erro ao salvar recente:', e);
+    }
+  }
+
+  // ── Busca ─────────────────────────────────────────────────────────────────
+
+  const handleBusca = useCallback(
+    (texto) => {
+      setBusca(texto);
+      if (!texto.trim()) {
+        setResultadosBusca([]);
+        return;
+      }
+      const q = texto.toLowerCase();
+      const filtradas = todasLinhas.filter(
+        l =>
+          l.codigo.toLowerCase().includes(q) ||
+          l.nome.toLowerCase().includes(q)
+      );
+      setResultadosBusca(filtradas);
+    },
+    [todasLinhas]
+  );
+
+  function handleSelecionarLinha(linha) {
+    setBusca('');
+    setResultadosBusca([]);
+    salvarRecente(linha);
+    router.push({ pathname: '/line-details', params: { linhaId: linha.id } });
+  }
+
+  // ── Render helpers ────────────────────────────────────────────────────────
+
+  function renderCardRecente(linha) {
+    const horarios = horariosCache[linha.id]
+      ? calcularHorarios(horariosCache[linha.id])
+      : { proximo: null, ultimo: null };
+
+    return (
+      <TouchableOpacity
+        key={linha.id}
+        style={styles.lineCard}
+        onPress={() => handleSelecionarLinha(linha)}
+        activeOpacity={0.75}
+      >
+        <View style={styles.circleNumber}>
+          <Text style={styles.circleNumberText}>{linha.codigo}</Text>
+        </View>
+
+        <View style={{ flex: 1 }}>
+          <Text style={styles.lineCardTitle}>
+            {linha.codigo} — {linha.nome}
+          </Text>
+          <View style={styles.lineCardSubRow}>
+            <Ionicons name="time-outline" size={12} color="#555" />
+            <Text style={styles.lineCardSub}>
+              {horarios.proximo
+                ? `Próximo: ${horarios.proximo}`
+                : 'Sem horários hoje'}
+            </Text>
+          </View>
+        </View>
+
+        {horarios.ultimo && (
+          <View style={styles.lineCardUltimo}>
+            <Text style={styles.lineCardUltimoLabel}>Último</Text>
+            <Text style={styles.lineCardUltimoHora}>{horarios.ultimo}</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  }
+
+  // ── JSX ───────────────────────────────────────────────────────────────────
 
   return (
     <View style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
-        {/* ... seu cabeçalho atual ... */}
-        <Text style={{fontSize: 24, fontWeight: 'bold', color: '#FFF'}}>
-          Vale<Text style={{color: '#A1BF34'}}>Bus</Text>
-        </Text>
-        {/* ... restante do cabeçalho ... */}
+        <View style={styles.headerTop}>
+          <View style={styles.logoRow}>
+            <View style={styles.logoCircle}>
+              <Text style={styles.logoCircleText}>VB</Text>
+            </View>
+            <Text style={styles.logoText}>
+              Vale<Text style={styles.logoAccent}>Bus</Text>
+            </Text>
+          </View>
+          <View style={styles.headerIcons}>
+            <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/notifications')}>
+              <Ionicons name="notifications-outline" size={20} color="#FFF" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/profile')}>
+              <Ionicons name="person-outline" size={20} color="#FFF" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Barra de busca */}
+        <View style={styles.searchBar}>
+          <Ionicons name="search-outline" size={18} color="#A1BF34" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Buscar linha ou destino..."
+            placeholderTextColor="#8aab8a"
+            value={busca}
+            onChangeText={handleBusca}
+            returnKeyType="search"
+            autoCorrect={false}
+            autoCapitalize="characters"
+          />
+          {busca.length > 0 && (
+            <TouchableOpacity onPress={() => { setBusca(''); setResultadosBusca([]); }}>
+              <Ionicons name="close-circle" size={18} color="#8aab8a" />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
-      <ScrollView style={{padding: 20}}>
-        <Text style={{fontSize: 18, fontWeight: 'bold', marginBottom: 15}}>Linhas Frequentes</Text>
+      {/* Dropdown de resultados da busca */}
+      {resultadosBusca.length > 0 && (
+        <View style={styles.searchDropdown}>
+          <FlatList
+            data={resultadosBusca}
+            keyExtractor={item => String(item.id)}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.searchResultItem}
+                onPress={() => handleSelecionarLinha(item)}
+              >
+                <View style={styles.searchResultCircle}>
+                  <Text style={styles.searchResultCodigo}>{item.codigo}</Text>
+                </View>
+                <Text style={styles.searchResultNome}>{item.nome}</Text>
+                <Ionicons name="chevron-forward" size={16} color="#aaa" />
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      )}
 
-        {/* CARD CLICÁVEL */}
-        <TouchableOpacity 
-          style={styles.lineCard} 
-          onPress={() => router.push('/line-details')} // Vai para a página de detalhes
-        >
-          <View style={styles.circleNumber}>
-            <Text style={{color: '#FFF', fontWeight: 'bold'}}>100</Text>
-          </View>
-          <View>
-            <Text style={{fontWeight: 'bold'}}>Linha 100</Text>
-            <Text style={{fontSize: 12, color: '#666'}}>Registro ↔ Eldorado</Text>
-          </View>
-        </TouchableOpacity>
+      {/* Corpo */}
+      <ScrollView style={styles.body} keyboardShouldPersistTaps="handled">
+        {loadingHome ? (
+          <ActivityIndicator size="large" color="#A1BF34" style={{ marginTop: 40 }} />
+        ) : (
+          <>
+            {linhasRecentes.length > 0 ? (
+              <>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Linhas frequentes</Text>
+                  <TouchableOpacity onPress={() => router.push('/all-lines')}>
+                    <Text style={styles.sectionLink}>Ver todas</Text>
+                  </TouchableOpacity>
+                </View>
+                {linhasRecentes.map(renderCardRecente)}
+              </>
+            ) : (
+              <View style={styles.emptyState}>
+                <Ionicons name="bus-outline" size={48} color="#A1BF34" />
+                <Text style={styles.emptyTitle}>Nenhuma linha recente</Text>
+                <Text style={styles.emptySubtitle}>
+                  Use a busca acima para encontrar sua linha e ela aparecerá aqui.
+                </Text>
+              </View>
+            )}
+          </>
+        )}
       </ScrollView>
     </View>
   );
