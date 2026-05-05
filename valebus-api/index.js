@@ -112,6 +112,46 @@ app.get('/linhas/:id', (req, res) => {
     });
 });
 
+// ─── Rota: listar alertas ativos ─────────────────────────────────────────────
+// Adicione este bloco no seu index.js junto às outras rotas
+
+app.get('/alertas', (req, res) => {
+    const sql = `
+    SELECT id, tipo, titulo, descricao, linha, criado_em
+    FROM alertas
+    WHERE ativo = 1
+    ORDER BY criado_em DESC
+  `;
+
+    db.query(sql, (err, results) => {
+        if (err) {
+            console.error('Erro ao buscar alertas:', err);
+            return res.status(500).json({ erro: 'Erro ao buscar alertas.' });
+        }
+        res.json(results);
+    });
+});
+
+// ─── Rota: desativar alerta (dispensar) ──────────────────────────────────────
+// Chamada quando o usuário aperta "Dispensar" em um alerta
+
+app.patch('/alertas/:id/desativar', (req, res) => {
+    const { id } = req.params;
+
+    const sql = `UPDATE alertas SET ativo = 0 WHERE id = ?`;
+
+    db.query(sql, [id], (err, result) => {
+        if (err) {
+            console.error('Erro ao desativar alerta:', err);
+            return res.status(500).json({ erro: 'Erro ao desativar alerta.' });
+        }
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ erro: 'Alerta não encontrado.' });
+        }
+        res.json({ mensagem: 'Alerta desativado com sucesso.' });
+    });
+});
+
 app.listen(3000, '0.0.0.0', () => {
     console.log("Servidor ValeBus rodando na porta 3000");
 });
