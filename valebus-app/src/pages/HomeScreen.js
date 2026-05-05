@@ -8,7 +8,7 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { styles } from '../styles/HomeStyles';
 
-const API_URL = 'http://192.168.1.6:3000'; // ⚠️ mesmo IP que você já usa
+const API_URL = 'http://10.0.2.2:3000'; // ⚠️ mesmo IP que você já usa
 const RECENTES_KEY = '@valebus:linhas_recentes';
 const MAX_RECENTES = 5;
 

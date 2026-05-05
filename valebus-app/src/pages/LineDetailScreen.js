@@ -5,7 +5,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { styles } from '../styles/DetailStyles';
 
 // ⚠️ Mesmo IP que você usa no login/cadastro
-const API_URL = 'http://192.168.1.6:3000';
+const API_URL = 'http://10.0.2.2:3000';
 
 export default function LineDetailScreen() {
   const router = useRouter();
