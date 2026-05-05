@@ -16,6 +16,11 @@ export default function RegisterScreen() {
       return;
     }
 
+    if (password.length < 6) {
+      Alert.alert("Aviso", "A senha deve ter pelo menos 6 caracteres.");
+      return;
+    }
+
     setLoading(true);
     try {
       const response = await fetch('http://10.0.2.2:3000/cadastro', {
@@ -24,14 +29,20 @@ export default function RegisterScreen() {
         body: JSON.stringify({ name, email, password }),
       });
 
+      const data = await response.json();
+
       if (response.ok) {
-        Alert.alert("Sucesso", "Conta criada com sucesso!");
-        router.replace('/login');
+        Alert.alert("Sucesso", "Conta criada com sucesso!", [
+          { text: "OK", onPress: () => router.replace('/login') }
+        ]);
       } else {
-        Alert.alert("Erro", "Falha ao realizar cadastro.");
+        // Trata e-mail duplicado
+        Alert.alert("Erro", data.erro?.includes('Duplicate') 
+          ? "Este e-mail já está cadastrado." 
+          : "Falha ao realizar cadastro.");
       }
     } catch (e) {
-      Alert.alert("Erro de Conexão", "Servidor offline.");
+      Alert.alert("Erro de Conexão", "Não foi possível conectar ao servidor.");
     } finally {
       setLoading(false);
     }
@@ -48,27 +59,28 @@ export default function RegisterScreen() {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Cadastro</Text>
         <Text style={styles.label}>Nome:</Text>
-        <TextInput 
-          style={styles.input} 
-          placeholder="Nome Completo" 
-          value={name} 
-          onChangeText={setName} 
+        <TextInput
+          style={styles.input}
+          placeholder="Nome Completo"
+          value={name}
+          onChangeText={setName}
         />
         <Text style={styles.label}>E-mail:</Text>
-        <TextInput 
-          style={styles.input} 
-          placeholder="Seu e-mail" 
-          value={email} 
-          onChangeText={setEmail} 
-          autoCapitalize="none" 
+        <TextInput
+          style={styles.input}
+          placeholder="Seu e-mail"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
         />
         <Text style={styles.label}>Senha:</Text>
-        <TextInput 
-          style={styles.input} 
-          placeholder="Sua senha" 
-          value={password} 
-          onChangeText={setPassword} 
-          secureTextEntry 
+        <TextInput
+          style={styles.input}
+          placeholder="Mínimo 6 caracteres"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
         />
       </View>
 

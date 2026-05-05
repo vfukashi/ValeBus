@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { styles } from '../styles/LoginStyles';
 
+
 export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
@@ -30,10 +31,10 @@ export default function LoginScreen() {
         await AsyncStorage.setItem('@valebus:user', JSON.stringify(data.usuario));
         router.replace('/(tabs)');
       } else {
-        Alert.alert("Erro", "E-mail ou senha incorretos.");
+        Alert.alert("Erro", data.mensagem || "E-mail ou senha incorretos.");
       }
     } catch (e) {
-      Alert.alert("Erro de Conexão", "Servidor offline.");
+      Alert.alert("Erro de Conexão", "Não foi possível conectar ao servidor.");
     } finally {
       setLoading(false);
     }
@@ -50,20 +51,21 @@ export default function LoginScreen() {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Login</Text>
         <Text style={styles.label}>E-mail:</Text>
-        <TextInput 
-          style={styles.input} 
-          placeholder="Seu e-mail" 
-          value={email} 
-          onChangeText={setEmail} 
-          autoCapitalize="none" 
+        <TextInput
+          style={styles.input}
+          placeholder="Seu e-mail"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
         />
         <Text style={styles.label}>Senha:</Text>
-        <TextInput 
-          style={styles.input} 
-          placeholder="Sua senha" 
-          value={password} 
-          onChangeText={setPassword} 
-          secureTextEntry 
+        <TextInput
+          style={styles.input}
+          placeholder="Sua senha"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
         />
       </View>
 
