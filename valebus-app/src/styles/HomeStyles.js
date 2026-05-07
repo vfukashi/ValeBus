@@ -147,6 +147,19 @@ export const styles = StyleSheet.create({
   },
 
   // ── Card de linha recente ─────────────────────────────────────────────────
+  verMaisBtn: {
+    flexDirection: 'row',
+    alignItems: 'center', gap: 4,
+  }, extrasContainer: {
+    overflow: 'hidden',
+  }, extrasDivider: {
+    height: 1,
+    backgroundColor: '#E5EEE5',
+    marginHorizontal: 4,
+    marginBottom: 8,
+  }, lineCardExtra: {
+    opacity: 0.92, // visual levemente diferente para os cards extras 
+  },
   lineCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 14,

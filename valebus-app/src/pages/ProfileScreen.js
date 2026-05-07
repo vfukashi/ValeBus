@@ -28,11 +28,11 @@ export default function ProfileScreen() {
 
   const loadUserData = async () => {
     try {
-      const savedUser = await AsyncStorage.getItem('@valebus:user');
-      const savedPhoto = await AsyncStorage.getItem('@valebus:photo');
+      const savedUser    = await AsyncStorage.getItem('@valebus:user');
+      const savedPhoto   = await AsyncStorage.getItem('@valebus:photo');
       const savedPremium = await AsyncStorage.getItem('@valebus:premium');
-      if (savedUser) setUser(JSON.parse(savedUser));
-      if (savedPhoto) setPhoto(savedPhoto);
+      if (savedUser)   setUser(JSON.parse(savedUser));
+      if (savedPhoto)  setPhoto(savedPhoto);
       if (savedPremium) setIsPremium(JSON.parse(savedPremium));
     } catch (error) {
       console.error('Erro ao carregar perfil:', error);
@@ -105,17 +105,24 @@ export default function ProfileScreen() {
     );
   }
 
-  // ── TELA VISITANTE ──────────────────────────────────
+  // ── TELA VISITANTE ──────────────────────────────────────────────────────────
   if (!user) {
     return (
       <View style={styles.mainContainer}>
-        <StatusBar barStyle="light-content" />
-        <View style={styles.topBackground} />
+        <StatusBar barStyle="light-content" backgroundColor="#0C2612" />
 
-        <View style={styles.guestContainer}>
-          <View style={styles.guestAvatar}>
-            <Ionicons name="person" size={52} color="rgba(255,255,255,0.5)" />
+        {/* Header igual às outras páginas */}
+        <View style={styles.guestHeader}>
+          <Ionicons name="person-circle-outline" size={22} color="#A1BF34" />
+          <Text style={styles.guestHeaderTitulo}>Perfil</Text>
+        </View>
+
+        {/* Conteúdo centralizado */}
+        <View style={styles.guestBody}>
+          <View style={styles.guestAvatarBox}>
+            <Ionicons name="person" size={52} color="#A1BF34" />
           </View>
+
           <Text style={styles.guestTitle}>Você não está logado</Text>
           <Text style={styles.guestSubtitle}>
             Faça login ou crie uma conta para acessar seu perfil, favoritos e muito mais.
@@ -130,20 +137,20 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Rodapé */}
         <View style={styles.guestFooter}>
           <TouchableOpacity style={styles.sobreGuestBtn} onPress={() => setSobreModalVisible(true)}>
-            <Ionicons name="information-circle-outline" size={18} color="#999" />
+            <Ionicons name="information-circle-outline" size={18} color="#A1BF34" />
             <Text style={styles.sobreGuestText}>Sobre o ValeBus</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Modal Sobre visível para visitante */}
         <ModalSobre visible={sobreModalVisible} onClose={() => setSobreModalVisible(false)} styles={styles} />
       </View>
     );
   }
 
-  // ── TELA LOGADO ─────────────────────────────────────
+  // ── TELA LOGADO ─────────────────────────────────────────────────────────────
   const inicialNome = user.nome ? user.nome.charAt(0).toUpperCase() : '?';
 
   return (
@@ -177,8 +184,7 @@ export default function ProfileScreen() {
       </View>
 
       <ScrollView style={styles.scrollArea} showsVerticalScrollIndicator={false}>
-
-        <Text style={styles.sectionTitle}>Perfil</Text>
+        <Text style={styles.sectionTitle}>PERFIL</Text>
         <View style={styles.card}>
           <MenuItem icon={<Ionicons name="person-outline" size={20} color="#1A4019" />} label="Nome" value={user.nome} onPress={handleOpenEdit} />
           <View style={styles.divider} />
@@ -187,7 +193,7 @@ export default function ProfileScreen() {
           <MenuItem icon={<Ionicons name="create-outline" size={20} color="#1A4019" />} label="Editar perfil" onPress={handleOpenEdit} showArrow />
         </View>
 
-        <Text style={styles.sectionTitle}>Outros</Text>
+        <Text style={styles.sectionTitle}>OUTROS</Text>
         <View style={styles.card}>
           {isPremium ? (
             <MenuItem
@@ -292,7 +298,7 @@ export default function ProfileScreen() {
   );
 }
 
-// ── MODAL SOBRE (compartilhado) ───────────────────────
+// ── MODAL SOBRE ───────────────────────────────────────────────────────────────
 function ModalSobre({ visible, onClose, styles }) {
   return (
     <Modal visible={visible} transparent animationType="slide">
@@ -329,7 +335,7 @@ function ModalSobre({ visible, onClose, styles }) {
   );
 }
 
-// ── COMPONENTES AUXILIARES ────────────────────────────
+// ── COMPONENTES AUXILIARES ────────────────────────────────────────────────────
 function MenuItem({ icon, label, value, onPress, showArrow }) {
   return (
     <TouchableOpacity style={styles.menuItem} onPress={onPress} disabled={!onPress}>

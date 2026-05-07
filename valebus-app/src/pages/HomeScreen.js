@@ -1,44 +1,41 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  ActivityIndicator, TextInput, FlatList,
+  ActivityIndicator, TextInput, FlatList, LayoutAnimation, Platform, UIManager
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { styles } from '../styles/HomeStyles';
-
-const API_URL = 'http://10.0.2.2:3000'; // ⚠️ mesmo IP que você já usa
+const API_URL = 'http://10.0.2.2:3000';
+ 
+// Habilita animação no Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+ 
 const RECENTES_KEY = '@valebus:linhas_recentes';
 const MAX_RECENTES = 5;
-
+const LIMITE_VISIVEIS = 3; // ← quantas aparecem por padrão
+ 
 // ─── Helpers de horário ────────────────────────────────────────────────────
-
-/**
- * Retorna o dia_tipo correto baseado no dia da semana atual (horário de Brasília).
- * Feriados são ignorados por enquanto (tratados como dia de semana normal).
- */
+ 
 function getDiaTipo() {
-  // Força fuso de Brasília (UTC-3)
   const agora = new Date(
     new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' })
   );
-  const diaSemana = agora.getDay(); // 0=Dom, 1=Seg … 6=Sáb
-
+  const diaSemana = agora.getDay();
   if (diaSemana === 0) return 'domingo_feriado';
   if (diaSemana === 6) return 'sabado';
-  // Terça(2), Quarta(4) e Sexta(5) também cobrem ter_qua_sex
   if ([2, 3, 5].includes(diaSemana)) return ['semana', 'ter_qua_sex'];
-  return 'semana'; // Segunda(1) e Quinta(4)
+  return 'semana';
 }
-
-/** Converte "HH:MM:SS" ou "HH:MM" em minutos desde meia-noite */
+ 
 function toMinutos(horarioStr) {
   const [h, m] = horarioStr.split(':').map(Number);
   return h * 60 + m;
 }
-
-/** Retorna "HH:MM" do horário atual no fuso de Brasília */
+ 
 function getAgora() {
   const agora = new Date(
     new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' })
@@ -47,61 +44,50 @@ function getAgora() {
   const m = String(agora.getMinutes()).padStart(2, '0');
   return `${h}:${m}`;
 }
-
-/**
- * Dado o array de horários de uma linha (todos os sub_linhas / dia_tipos),
- * calcula o próximo horário e o último horário do dia atual.
- *
- * Consideramos apenas sub_linhas com sentido "Centro / Bairro" (ida),
- * pois é o que faz mais sentido para o usuário na home.
- * Você pode ajustar esse filtro conforme precisar.
- */
+ 
 function calcularHorarios(horariosLinha) {
-  const diaTipo = getDiaTipo(); // string ou array
+  const diaTipo = getDiaTipo();
   const agoraMin = toMinutos(getAgora());
-
-  // Filtra pelos horários relevantes ao dia atual
+ 
   const horariosHoje = horariosLinha.filter(h => {
     if (Array.isArray(diaTipo)) return diaTipo.includes(h.dia_tipo);
     return h.dia_tipo === diaTipo;
   });
-
+ 
   if (horariosHoje.length === 0) return { proximo: null, ultimo: null };
-
+ 
   const minutosHoje = horariosHoje
     .map(h => toMinutos(h.horario))
     .sort((a, b) => a - b);
-
+ 
   const proximoMin = minutosHoje.find(m => m > agoraMin) ?? null;
   const ultimoMin = minutosHoje[minutosHoje.length - 1];
-
+ 
   const fmt = min => {
     if (min === null) return null;
     return `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
   };
-
+ 
   return { proximo: fmt(proximoMin), ultimo: fmt(ultimoMin) };
 }
-
+ 
 // ─── Componente principal ──────────────────────────────────────────────────
-
+ 
 export default function HomeScreen() {
   const router = useRouter();
-
+ 
   const [todasLinhas, setTodasLinhas] = useState([]);
   const [linhasRecentes, setLinhasRecentes] = useState([]);
-  const [horariosCache, setHorariosCache] = useState({}); // { [linhaId]: [...] }
+  const [horariosCache, setHorariosCache] = useState({});
   const [busca, setBusca] = useState('');
   const [resultadosBusca, setResultadosBusca] = useState([]);
-  const [buscando, setBuscando] = useState(false);
   const [loadingHome, setLoadingHome] = useState(true);
-
-  // Carrega todas as linhas e os IDs recentes ao montar
+  const [expandido, setExpandido] = useState(false); // ← controla o "Ver mais"
+ 
   useEffect(() => {
     Promise.all([buscarTodasLinhas(), carregarRecentes()]);
   }, []);
-
-  // Quando as linhas recentes ou o cache de horários mudam, busca horários faltando
+ 
   useEffect(() => {
     linhasRecentes.forEach(linha => {
       if (!horariosCache[linha.id]) {
@@ -109,9 +95,9 @@ export default function HomeScreen() {
       }
     });
   }, [linhasRecentes]);
-
+ 
   // ── Dados ────────────────────────────────────────────────────────────────
-
+ 
   async function buscarTodasLinhas() {
     try {
       const res = await fetch(`${API_URL}/linhas`);
@@ -123,7 +109,7 @@ export default function HomeScreen() {
       setLoadingHome(false);
     }
   }
-
+ 
   async function buscarHorarios(linhaId) {
     try {
       const res = await fetch(`${API_URL}/linhas/${linhaId}/horarios`);
@@ -133,25 +119,22 @@ export default function HomeScreen() {
       console.error(`Erro ao buscar horários da linha ${linhaId}:`, e);
     }
   }
-
-  // ── Recentes (AsyncStorage) ───────────────────────────────────────────────
-
+ 
+  // ── Recentes ─────────────────────────────────────────────────────────────
+ 
   async function carregarRecentes() {
     try {
       const raw = await AsyncStorage.getItem(RECENTES_KEY);
-      const ids = raw ? JSON.parse(raw) : [];
-      // ids é array de objetos { id, codigo, nome }
-      setLinhasRecentes(ids);
+      setLinhasRecentes(raw ? JSON.parse(raw) : []);
     } catch (e) {
       console.error('Erro ao carregar recentes:', e);
     }
   }
-
+ 
   async function salvarRecente(linha) {
     try {
       const raw = await AsyncStorage.getItem(RECENTES_KEY);
       let recentes = raw ? JSON.parse(raw) : [];
-      // Remove se já existe e coloca no topo
       recentes = recentes.filter(r => r.id !== linha.id);
       recentes.unshift({ id: linha.id, codigo: linha.codigo, nome: linha.nome });
       if (recentes.length > MAX_RECENTES) recentes = recentes.slice(0, MAX_RECENTES);
@@ -161,9 +144,9 @@ export default function HomeScreen() {
       console.error('Erro ao salvar recente:', e);
     }
   }
-
+ 
   // ── Busca ─────────────────────────────────────────────────────────────────
-
+ 
   const handleBusca = useCallback(
     (texto) => {
       setBusca(texto);
@@ -172,94 +155,95 @@ export default function HomeScreen() {
         return;
       }
       const q = texto.toLowerCase();
-      const filtradas = todasLinhas.filter(
-        l =>
-          l.codigo.toLowerCase().includes(q) ||
-          l.nome.toLowerCase().includes(q)
+      setResultadosBusca(
+        todasLinhas.filter(
+          l => l.codigo.toLowerCase().includes(q) || l.nome.toLowerCase().includes(q)
+        )
       );
-      setResultadosBusca(filtradas);
     },
     [todasLinhas]
   );
-
+ 
   function handleSelecionarLinha(linha) {
     setBusca('');
     setResultadosBusca([]);
     salvarRecente(linha);
     router.push({ pathname: '/line-details', params: { linhaId: linha.id } });
   }
-
-  // ── Render helpers ────────────────────────────────────────────────────────
-
-  function renderCardRecente(linha) {
+ 
+  // ── Toggle expandir ───────────────────────────────────────────────────────
+ 
+  function toggleExpandir() {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpandido(prev => !prev);
+  }
+ 
+  // ── Card de linha recente ─────────────────────────────────────────────────
+ 
+  function renderCardRecente(linha, index, isExtra = false) {
     const horarios = horariosCache[linha.id]
       ? calcularHorarios(horariosCache[linha.id])
       : { proximo: null, ultimo: null };
-
+ 
     return (
-      <TouchableOpacity
+<TouchableOpacity
         key={linha.id}
-        style={styles.lineCard}
+        style={[styles.lineCard, isExtra && styles.lineCardExtra]}
         onPress={() => handleSelecionarLinha(linha)}
         activeOpacity={0.75}
-      >
-        <View style={styles.circleNumber}>
-          <Text style={styles.circleNumberText}>{linha.codigo}</Text>
-        </View>
-
+>
+<View style={styles.circleNumber}>
+<Text style={styles.circleNumberText}>{linha.codigo}</Text>
+</View>
+ 
         <View style={{ flex: 1 }}>
-          <Text style={styles.lineCardTitle}>
+<Text style={styles.lineCardTitle}>
             {linha.codigo} — {linha.nome}
-          </Text>
-          <View style={styles.lineCardSubRow}>
-            <Ionicons name="time-outline" size={12} color="#555" />
-            <Text style={styles.lineCardSub}>
-              {horarios.proximo
-                ? `Próximo: ${horarios.proximo}`
-                : 'Sem horários hoje'}
-            </Text>
-          </View>
-        </View>
-
+</Text>
+<View style={styles.lineCardSubRow}>
+<Ionicons name="time-outline" size={12} color="#555" />
+<Text style={styles.lineCardSub}>
+              {horarios.proximo ? `Próximo: ${horarios.proximo}` : 'Sem horários hoje'}
+</Text>
+</View>
+</View>
+ 
         {horarios.ultimo && (
-          <View style={styles.lineCardUltimo}>
-            <Text style={styles.lineCardUltimoLabel}>Último</Text>
-            <Text style={styles.lineCardUltimoHora}>{horarios.ultimo}</Text>
-          </View>
+<View style={styles.lineCardUltimo}>
+<Text style={styles.lineCardUltimoLabel}>Último</Text>
+<Text style={styles.lineCardUltimoHora}>{horarios.ultimo}</Text>
+</View>
         )}
-      </TouchableOpacity>
+</TouchableOpacity>
     );
   }
-
+ 
   // ── JSX ───────────────────────────────────────────────────────────────────
-
+ 
+  const visiveis = linhasRecentes.slice(0, LIMITE_VISIVEIS);
+  const extras = linhasRecentes.slice(LIMITE_VISIVEIS);
+  const temMais = extras.length > 0;
+ 
   return (
-    <View style={styles.container}>
+<View style={styles.container}>
+ 
       {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View style={styles.logoRow}>
-            <View style={styles.logoCircle}>
-              <Text style={styles.logoCircleText}>VB</Text>
-            </View>
-            <Text style={styles.logoText}>
+<View style={styles.header}>
+<View style={styles.headerTop}>
+<View style={styles.logoRow}>
+<View style={styles.logoCircle}>
+<Text style={styles.logoCircleText}>VB</Text>
+</View>
+<Text style={styles.logoText}>
               Vale<Text style={styles.logoAccent}>Bus</Text>
-            </Text>
-          </View>
-          <View style={styles.headerIcons}>
-            <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/notifications')}>
-              <Ionicons name="notifications-outline" size={20} color="#FFF" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/profile')}>
-              <Ionicons name="person-outline" size={20} color="#FFF" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
+</Text>
+</View>
+</View>
+ 
         {/* Barra de busca */}
-        <View style={styles.searchBar}>
-          <Ionicons name="search-outline" size={18} color="#A1BF34" />
-          <TextInput
+<View style={styles.searchBar}>
+<Ionicons name="search-outline" size={18} color="#A1BF34" />
+<TextInput
             style={styles.searchInput}
             placeholder="Buscar linha ou destino..."
             placeholderTextColor="#8aab8a"
@@ -270,64 +254,80 @@ export default function HomeScreen() {
             autoCapitalize="characters"
           />
           {busca.length > 0 && (
-            <TouchableOpacity onPress={() => { setBusca(''); setResultadosBusca([]); }}>
-              <Ionicons name="close-circle" size={18} color="#8aab8a" />
-            </TouchableOpacity>
+<TouchableOpacity onPress={() => { setBusca(''); setResultadosBusca([]); }}>
+<Ionicons name="close-circle" size={18} color="#8aab8a" />
+</TouchableOpacity>
           )}
-        </View>
-      </View>
-
-      {/* Dropdown de resultados da busca */}
+</View>
+</View>
+ 
+      {/* Dropdown de busca */}
       {resultadosBusca.length > 0 && (
-        <View style={styles.searchDropdown}>
-          <FlatList
+<View style={styles.searchDropdown}>
+<FlatList
             data={resultadosBusca}
             keyExtractor={item => String(item.id)}
             keyboardShouldPersistTaps="handled"
             renderItem={({ item }) => (
-              <TouchableOpacity
+<TouchableOpacity
                 style={styles.searchResultItem}
                 onPress={() => handleSelecionarLinha(item)}
-              >
-                <View style={styles.searchResultCircle}>
-                  <Text style={styles.searchResultCodigo}>{item.codigo}</Text>
-                </View>
-                <Text style={styles.searchResultNome}>{item.nome}</Text>
-                <Ionicons name="chevron-forward" size={16} color="#aaa" />
-              </TouchableOpacity>
+>
+<View style={styles.searchResultCircle}>
+<Text style={styles.searchResultCodigo}>{item.codigo}</Text>
+</View>
+<Text style={styles.searchResultNome}>{item.nome}</Text>
+<Ionicons name="chevron-forward" size={16} color="#aaa" />
+</TouchableOpacity>
             )}
           />
-        </View>
+</View>
       )}
-
+ 
       {/* Corpo */}
-      <ScrollView style={styles.body} keyboardShouldPersistTaps="handled">
+<ScrollView style={styles.body} keyboardShouldPersistTaps="handled">
         {loadingHome ? (
-          <ActivityIndicator size="large" color="#A1BF34" style={{ marginTop: 40 }} />
-        ) : (
-          <>
-            {linhasRecentes.length > 0 ? (
-              <>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>Linhas frequentes</Text>
-                  <TouchableOpacity onPress={() => router.push('/all-lines')}>
-                    <Text style={styles.sectionLink}>Ver todas</Text>
-                  </TouchableOpacity>
-                </View>
-                {linhasRecentes.map(renderCardRecente)}
-              </>
-            ) : (
-              <View style={styles.emptyState}>
-                <Ionicons name="bus-outline" size={48} color="#A1BF34" />
-                <Text style={styles.emptyTitle}>Nenhuma linha recente</Text>
-                <Text style={styles.emptySubtitle}>
-                  Use a busca acima para encontrar sua linha e ela aparecerá aqui.
-                </Text>
-              </View>
+<ActivityIndicator size="large" color="#A1BF34" style={{ marginTop: 40 }} />
+        ) : linhasRecentes.length > 0 ? (
+<>
+            {/* Cabeçalho da seção */}
+<View style={styles.sectionHeader}>
+<Text style={styles.sectionTitle}>Linhas frequentes</Text>
+              {temMais && (
+<TouchableOpacity onPress={toggleExpandir} style={styles.verMaisBtn}>
+<Text style={styles.sectionLink}>
+                    {expandido ? 'Ver menos' : 'Ver mais'}
+</Text>
+<Ionicons
+                    name={expandido ? 'chevron-up' : 'chevron-down'}
+                    size={14}
+                    color="#A1BF34"
+                  />
+</TouchableOpacity>
+              )}
+</View>
+ 
+            {/* 3 primeiras sempre visíveis */}
+            {visiveis.map((linha, i) => renderCardRecente(linha, i))}
+ 
+            {/* Extras — aparecem ao expandir */}
+            {expandido && extras.length > 0 && (
+<View style={styles.extrasContainer}>
+<View style={styles.extrasDivider} />
+                {extras.map((linha, i) => renderCardRecente(linha, i, true))}
+</View>
             )}
-          </>
+</>
+        ) : (
+<View style={styles.emptyState}>
+<Ionicons name="bus-outline" size={48} color="#A1BF34" />
+<Text style={styles.emptyTitle}>Nenhuma linha recente</Text>
+<Text style={styles.emptySubtitle}>
+              Use a busca acima para encontrar sua linha e ela aparecerá aqui.
+</Text>
+</View>
         )}
-      </ScrollView>
-    </View>
+</ScrollView>
+</View>
   );
 }

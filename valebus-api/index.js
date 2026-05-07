@@ -152,6 +152,145 @@ app.patch('/alertas/:id/desativar', (req, res) => {
     });
 });
 
+// ─── Rotas de favoritos ───────────────────────────────────────────────────────
+// Adicione este bloco no seu index.js junto às outras rotas
+
+// Helper: retorna o dia_tipo baseado no dia da semana atual
+function getDiaTipo() {
+  const dia = new Date().getDay(); // 0=Dom, 1=Seg ... 6=Sab
+  if (dia === 0) return 'domingo_feriado';
+  if (dia === 6) return 'sabado';
+  return 'semana';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /favoritos/:usuario_id
+// Retorna as linhas favoritas do usuário com o próximo horário do dia
+// ─────────────────────────────────────────────────────────────────────────────
+app.get('/favoritos/:usuario_id', (req, res) => {
+  const { usuario_id } = req.params;
+  const diaTipo   = getDiaTipo();
+  const horaAtual = new Date().toTimeString().slice(0, 8); // HH:MM:SS
+
+  const sql = `
+    SELECT
+      l.id         AS linha_id,
+      l.codigo,
+      l.nome,
+      l.descricao,
+      (
+        SELECT CONCAT(sl.sentido, '|', sl.origem, '|', TIME_FORMAT(h.horario, '%H:%i'))
+        FROM sub_linhas sl
+        JOIN horarios h ON h.sub_linha_id = sl.id
+        WHERE sl.linha_id = l.id
+          AND h.dia_tipo  = ?
+          AND h.horario   > ?
+        ORDER BY h.horario ASC
+        LIMIT 1
+      ) AS proximo_raw
+    FROM favoritos f
+    JOIN linhas l ON l.id = f.linha_id
+    WHERE f.usuario_id = ?
+    ORDER BY l.codigo ASC
+  `;
+
+  db.query(sql, [diaTipo, horaAtual, usuario_id], (err, results) => {
+    if (err) {
+      console.error('Erro ao buscar favoritos:', err);
+      return res.status(500).json({ erro: 'Erro ao buscar favoritos.' });
+    }
+
+    const favoritos = results.map(row => {
+      let proximo = null;
+      if (row.proximo_raw) {
+        const [sentido, origem, horario] = row.proximo_raw.split('|');
+        proximo = { sentido, origem, horario };
+      }
+      return {
+        linha_id:  row.linha_id,
+        codigo:    row.codigo,
+        nome:      row.nome,
+        descricao: row.descricao,
+        proximo,
+      };
+    });
+
+    res.json(favoritos);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /favoritos/ids?usuario_id=X&linha_id=Y
+// Retorna se uma linha específica está favoritada pelo usuário
+// Usado pela LineDetailScreen para saber se a estrela fica cheia ou vazia
+// ─────────────────────────────────────────────────────────────────────────────
+app.get('/favoritos/ids', (req, res) => {
+  const { usuario_id, linha_id } = req.query;
+
+  if (!usuario_id || !linha_id) {
+    return res.status(400).json({ erro: 'usuario_id e linha_id são obrigatórios.' });
+  }
+
+  const sql = `
+    SELECT id FROM favoritos WHERE usuario_id = ? AND linha_id = ? LIMIT 1
+  `;
+
+  db.query(sql, [usuario_id, linha_id], (err, results) => {
+    if (err) {
+      console.error('Erro ao verificar favorito:', err);
+      return res.status(500).json({ erro: 'Erro interno.' });
+    }
+    res.json({ favoritado: results.length > 0 });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /favoritos
+// Adiciona uma linha aos favoritos  { usuario_id, linha_id }
+// ─────────────────────────────────────────────────────────────────────────────
+app.post('/favoritos', (req, res) => {
+  const { usuario_id, linha_id } = req.body;
+
+  if (!usuario_id || !linha_id) {
+    return res.status(400).json({ erro: 'usuario_id e linha_id são obrigatórios.' });
+  }
+
+  const sql = `INSERT IGNORE INTO favoritos (usuario_id, linha_id) VALUES (?, ?)`;
+
+  db.query(sql, [usuario_id, linha_id], (err) => {
+    if (err) {
+      console.error('Erro ao favoritar:', err);
+      return res.status(500).json({ erro: 'Erro ao salvar favorito.' });
+    }
+    res.json({ mensagem: 'Linha favoritada com sucesso.' });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DELETE /favoritos
+// Remove uma linha dos favoritos  { usuario_id, linha_id }
+// ─────────────────────────────────────────────────────────────────────────────
+app.delete('/favoritos', (req, res) => {
+  const { usuario_id, linha_id } = req.body;
+
+  if (!usuario_id || !linha_id) {
+    return res.status(400).json({ erro: 'usuario_id e linha_id são obrigatórios.' });
+  }
+
+  const sql = `DELETE FROM favoritos WHERE usuario_id = ? AND linha_id = ?`;
+
+  db.query(sql, [usuario_id, linha_id], (err, result) => {
+    if (err) {
+      console.error('Erro ao desfavoritar:', err);
+      return res.status(500).json({ erro: 'Erro ao remover favorito.' });
+    }
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ erro: 'Favorito não encontrado.' });
+    }
+    res.json({ mensagem: 'Favorito removido com sucesso.' });
+  });
+});
+
 app.listen(3000, '0.0.0.0', () => {
     console.log("Servidor ValeBus rodando na porta 3000");
 });

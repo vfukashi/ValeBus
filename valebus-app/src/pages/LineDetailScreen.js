@@ -1,21 +1,48 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StatusBar, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  StatusBar,
+  ActivityIndicator,
+  Alert,
+} from 'react-native';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { styles } from '../styles/DetailStyles';
 
-// ⚠️ Mesmo IP que você usa no login/cadastro
 const API_URL = 'http://10.0.2.2:3000';
+// const API_URL = 'http://192.168.1.6:3000'; // celular físico
 
 export default function LineDetailScreen() {
   const router = useRouter();
-  const { linhaId } = useLocalSearchParams(); // ← recebe o ID passado pela Home
+  const { linhaId } = useLocalSearchParams();
 
-  const [isFavorite, setIsFavorite] = useState(false);
-  const [linha, setLinha] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [linha, setLinha]                   = useState(null);
+  const [loading, setLoading]               = useState(true);
   const [diaSelecionado, setDiaSelecionado] = useState('semana');
 
+  const [usuario, setUsuario]       = useState(null);
+  const [favoritado, setFavoritado] = useState(false);
+  const [salvando, setSalvando]     = useState(false);
+
+  // Carrega usuário logado e verifica se já é favorito
+  useEffect(() => {
+    AsyncStorage.getItem('@valebus:user').then(data => {
+      if (!data) return;
+      const user = JSON.parse(data);
+      setUsuario(user);
+
+      fetch(`${API_URL}/favoritos/ids?usuario_id=${user.id}&linha_id=${linhaId}`)
+        .then(r => r.json())
+        .then(res => setFavoritado(res.favoritado === true))
+        .catch(() => {});
+    });
+  }, [linhaId]);
+
+  // Busca dados da linha
   useEffect(() => {
     if (linhaId) buscarDadosLinha();
   }, [linhaId]);
@@ -33,12 +60,40 @@ export default function LineDetailScreen() {
     }
   }
 
-  // Filtra os horários pelo dia selecionado
+  // Favoritar / desfavoritar
+  async function toggleFavorito() {
+    if (!usuario) {
+      Alert.alert('Atenção', 'Você precisa estar logado para favoritar uma linha.');
+      return;
+    }
+    if (salvando) return;
+
+    const eraFavoritado = favoritado;
+    setFavoritado(!eraFavoritado);
+    setSalvando(true);
+
+    try {
+      const response = await fetch(`${API_URL}/favoritos`, {
+        method: eraFavoritado ? 'DELETE' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          usuario_id: usuario.id,
+          linha_id: Number(linhaId),
+        }),
+      });
+
+      if (!response.ok) throw new Error();
+    } catch {
+      setFavoritado(eraFavoritado); // reverte em caso de erro
+    } finally {
+      setSalvando(false);
+    }
+  }
+
   function horariosDoTipo(subLinha, tipo) {
     return subLinha.horarios.filter(h => h.dia_tipo === tipo);
   }
 
-  // Formata o horario de TIME do MySQL (ex: "06:55:00" → "06:55")
   function formatarHorario(horario) {
     return horario.substring(0, 5);
   }
@@ -68,39 +123,19 @@ export default function LineDetailScreen() {
           <Ionicons name="arrow-back" size={28} color="#FFF" />
         </TouchableOpacity>
 
-        {/* Nome dinâmico vindo do banco */}
         <Text style={styles.lineTitle}>
           {linha.codigo} - {linha.nome}
         </Text>
 
-        <TouchableOpacity onPress={() => setIsFavorite(!isFavorite)}>
+        <TouchableOpacity onPress={toggleFavorito} disabled={salvando}>
           <FontAwesome5
             name="star"
-            solid={isFavorite}
+            solid={favoritado}
             size={24}
-            color={isFavorite ? "#A1BF34" : "#FFF"}
+            color={favoritado ? '#A1BF34' : '#FFF'}
           />
         </TouchableOpacity>
       </View>
-
-      {/* Abas de dia */}
-      <View style={styles.tabContainer}>
-        {[
-          { tipo: 'semana', label: 'Seg - Sex' },
-          { tipo: 'sabado', label: 'Sábado' },
-          { tipo: 'domingo_feriado', label: 'Dom / Fer' },
-        ].map(({ tipo, label }) => (
-          <TouchableOpacity
-            key={tipo}
-            style={[styles.tab, diaSelecionado === tipo && styles.tabAtiva]}
-            onPress={() => setDiaSelecionado(tipo)}
-          >
-            <Text style={styles.tabTexto}>{label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Substitua o bloco do ScrollView e adicione os novos styles */}
 
       <ScrollView>
         {/* Card do Mapa */}
@@ -116,11 +151,10 @@ export default function LineDetailScreen() {
 
         {/* Card de Horários */}
         <View style={styles.scheduleCard}>
-          {/* Abas */}
           <View style={styles.tabContainer}>
             {[
-              { tipo: 'semana', label: 'Seg – Sex' },
-              { tipo: 'sabado', label: 'Sábado' },
+              { tipo: 'semana',          label: 'Seg – Sex' },
+              { tipo: 'sabado',          label: 'Sábado'    },
               { tipo: 'domingo_feriado', label: 'Dom / Fer' },
             ].map(({ tipo, label }) => (
               <TouchableOpacity
@@ -135,7 +169,6 @@ export default function LineDetailScreen() {
             ))}
           </View>
 
-          {/* Sub-linhas */}
           {linha.sub_linhas.map((subLinha, index) => (
             <View
               key={subLinha.id}
@@ -149,14 +182,20 @@ export default function LineDetailScreen() {
                 </View>
               </View>
 
-              {horariosDoTipo(subLinha, diaSelecionado).map((h, i) => (
-                <View key={i} style={styles.horarioRow}>
-                  <Text style={styles.horarioTime}>{formatarHorario(h.horario)}</Text>
-                  {h.observacao ? (
-                    <Text style={styles.horarioObs}>{h.observacao}</Text>
-                  ) : null}
-                </View>
-              ))}
+              {horariosDoTipo(subLinha, diaSelecionado).length === 0 ? (
+                <Text style={{ color: '#8FA89C', fontSize: 13, marginTop: 8 }}>
+                  Sem horários para este dia.
+                </Text>
+              ) : (
+                horariosDoTipo(subLinha, diaSelecionado).map((h, i) => (
+                  <View key={i} style={styles.horarioRow}>
+                    <Text style={styles.horarioTime}>{formatarHorario(h.horario)}</Text>
+                    {h.observacao ? (
+                      <Text style={styles.horarioObs}>{h.observacao}</Text>
+                    ) : null}
+                  </View>
+                ))
+              )}
             </View>
           ))}
         </View>

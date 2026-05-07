@@ -18,34 +18,47 @@ export const styles = StyleSheet.create({
   },
 
   // ── VISITANTE ────────────────────────────────────────
-  guestContainer: {
+  guestHeader: {
+    backgroundColor: '#0C2612',
+    paddingTop: 48,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  guestHeaderTitulo: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  guestBody: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 32,
-    paddingBottom: 120,
+    paddingBottom: 40,
   },
-  guestAvatar: {
+  guestAvatarBox: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: '#E8F0DC',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.2)',
+    marginBottom: 24,
   },
   guestTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#1A1A1A',
+    color: '#1A4019',
     marginBottom: 10,
     textAlign: 'center',
   },
   guestSubtitle: {
     fontSize: 14,
-    color: '#888',
+    color: '#5A7A5E',
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 32,
@@ -61,7 +74,7 @@ export const styles = StyleSheet.create({
     elevation: 2,
   },
   guestBtnPrimaryText: {
-    color: '#FFF',
+    color: '#0C2612',
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -91,8 +104,9 @@ export const styles = StyleSheet.create({
     padding: 8,
   },
   sobreGuestText: {
-    color: '#999',
+    color: '#A1BF34',
     fontSize: 13,
+    fontWeight: '500',
   },
 
   // ── HEADER LOGADO ────────────────────────────────────
